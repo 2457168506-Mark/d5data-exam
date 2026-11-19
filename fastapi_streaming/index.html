@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>FastAPI 流式接口验证</title>
+<style>
+  body { font-family: sans-serif; max-width: 760px; margin: 40px auto; padding: 0 12px; }
+  #out { background: #0f172a; color: #e2e8f0; padding: 12px; min-height: 140px;
+         white-space: pre-wrap; border-radius: 6px; }
+  #log { font: 12px monospace; color: #666; white-space: pre-wrap; margin-top: 8px; }
+</style>
+</head>
+<body>
+<h3>FastAPI 流式接口验证</h3>
+<p>点击开始,观察文字是否每 0.3 秒出现一行。</p>
+<input id="prompt" value="你好"> <button id="btn">开始</button>
+<div id="out"></div>
+<div id="log"></div>
+<script>
+const out = document.getElementById("out"), log = document.getElementById("log");
+document.getElementById("btn").onclick = () => {
+  out.textContent = ""; log.textContent = "";
+  const start = performance.now();
+  // EventSource 会自动按 SSE 格式解析 data: 行
+  const es = new EventSource("/stream?prompt=" + encodeURIComponent(document.getElementById("prompt").value));
+  es.onmessage = e => {
+    if (e.data === "[DONE]") { es.close(); return; }
+    const ms = (performance.now() - start).toFixed(0);
+    out.textContent += e.data + "\n";
+    log.textContent += `[+${ms} ms] ${e.data}\n`;
+  };
+};
+</script>
+</body>
+</html>

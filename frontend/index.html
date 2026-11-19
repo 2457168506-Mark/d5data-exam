@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Upload Your Resume</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="card">
+    <!-- 左栏：标题 + 插画 -->
+    <section class="intro" aria-labelledby="page-title">
+      <div class="intro__text">
+        <p class="intro__step">Finish!</p>
+        <h1 class="intro__title" id="page-title">Upload Your Resume</h1>
+        <p class="intro__desc">
+          Upload your resume, the platform will help you parse and optimize,
+          you can also skip this step
+        </p>
+      </div>
+      <picture>
+        <source srcset="assets/illustration.webp" type="image/webp" />
+        <img
+          class="intro__illustration"
+          src="assets/illustration.png"
+          alt="Illustration of a blue cat writing a resume with a feather quill"
+          width="1452"
+          height="1240"
+        />
+      </picture>
+    </section>
+
+    <!-- 右栏：上传面板 -->
+    <section class="panel" aria-labelledby="panel-title">
+      <h2 class="panel__title" id="panel-title">Upload file</h2>
+
+      <div
+        class="dropzone"
+        id="dropzone"
+        role="button"
+        tabindex="0"
+        aria-label="Upload resume file"
+      >
+        <svg
+          class="dropzone__icon"
+          viewBox="0 0 64 64"
+          width="56"
+          height="56"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="3.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M20 44h-4a10 10 0 0 1-2-19.77A14 14 0 0 1 36.2 18.2 12 12 0 0 1 48 30a9 9 0 0 1-1 17.9" />
+          <path d="M32 30v18" />
+          <path d="m25 37 7-7 7 7" />
+        </svg>
+        <p class="dropzone__hint">
+          Drag your resume file to this area, or click on the area to select
+          the appropriate file to upload
+        </p>
+        <p class="dropzone__file" id="fileName" hidden></p>
+        <input
+          type="file"
+          id="fileInput"
+          class="visually-hidden"
+          accept=".pdf,.doc,.docx,.txt,.rtf"
+        />
+      </div>
+
+      <div class="actions">
+        <button type="button" class="btn btn--secondary" id="lastStepBtn">Last step</button>
+        <button type="button" class="btn btn--primary">Finish</button>
+      </div>
+
+      <ol class="progress" aria-label="Progress: step 3 of 3">
+        <li class="progress__dot" aria-label="Step 1 completed">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="m5 12.5 4.5 4.5L19 7.5" />
+          </svg>
+        </li>
+        <li class="progress__dot" aria-label="Step 2 completed">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="m5 12.5 4.5 4.5L19 7.5" />
+          </svg>
+        </li>
+        <li class="progress__dot" id="dot3" aria-label="Step 3 in progress">
+          <span class="progress__num" id="stepNum">3</span>
+          <svg id="stepCheck" class="progress__check" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="m5 12.5 4.5 4.5L19 7.5" />
+          </svg>
+        </li>
+      </ol>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
