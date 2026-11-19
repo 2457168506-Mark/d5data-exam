@@ -3,9 +3,12 @@
 MIT 招生博客爬虫（https://mitadmissions.org/blogs/）。
 
 分工：
-  * Playwright   -- 渲染列表页，遍历分页，拿到标题/作者/详情链接，并等待
-                    Disqus 组件把评论数注入页面后读取；
+  * Playwright   -- 渲染列表页，遍历分页，拿到标题/作者/详情链接和
+                    Disqus identifier，并等组件注入评论数作为兜底；
   * DrissionPage -- 用 requests 会话抓详情页，提取时间/正文/正文图片。
+
+评论数首选向 Disqus 的 count-data.js 批量查询（一次可查多篇），
+查询失败时回落到列表页组件注入的数字，仍为空则记 0。
 
 输出 CSV（utf-8-sig），表头：Title | Author | Comment Count | Time |
 Article Content | Images In Article（图片为绝对地址的 JSON 数组字符串）。
@@ -21,10 +24,14 @@ import json
 import random
 import re
 import time
+import urllib.parse
+import urllib.request
 from pathlib import Path
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
 BASE_URL = "https://mitadmissions.org/blogs/"
+# Disqus 计数接口：?1=<identifier>&1=<identifier>... 返回 DISQUSWIDGETS.displayCount({...})
+COUNT_API = "https://mitadmissions.disqus.com/count-data.js"
 
 # 礼貌爬取：详情页间隔 1.5~3.5s，翻页间隔 2~4s
 DETAIL_DELAY = (1.5, 3.5)
@@ -36,18 +43,28 @@ HEADERS = {
     "Accept-Language": "en-US,en;q=0.9",
 }
 
-# 列表页提取：标题、详情链接、作者、评论数（数字由 Disqus 异步注入）
+# 列表页提取：标题、详情链接、作者、评论数文本、Disqus identifier。
+# 注意：页面上的 emoji 会被 WordPress 替换成 <img alt="emoji">，取文本时要用 alt 还原。
 LIST_EXTRACT_JS = r"""
-() => Array.from(document.querySelectorAll('main article')).map(art => {
-  const clean = s => (s || '').replace(/\s+/g, ' ').trim();
-  const h2 = art.querySelector('h2');
-  return {
-    title: h2 ? clean(h2.textContent) : '',
-    url: h2 ? (h2.querySelector('a[href*="/blogs/entry/"]')?.href || '') : '',
-    author: clean(art.querySelector('a[href*="/blogs/author/"]')?.textContent),
-    comments: (art.querySelector('a[data-disqus-identifier]')?.textContent || '').trim(),
+() => {
+  const text = el => {
+    if (!el) return '';
+    const c = el.cloneNode(true);
+    c.querySelectorAll('img[alt]').forEach(i => i.replaceWith(i.alt));
+    return c.textContent.replace(/\s+/g, ' ').trim();
   };
-})
+  return Array.from(document.querySelectorAll('main article')).map(art => {
+    const h2 = art.querySelector('h2');
+    const cc = art.querySelector('a[data-disqus-identifier]');
+    return {
+      title: text(h2),
+      url: h2?.querySelector('a[href*="/blogs/entry/"]')?.href || '',
+      author: text(art.querySelector('a[href*="/blogs/author/"]')),
+      comments: (cc?.textContent || '').trim(),
+      identifier: cc?.getAttribute('data-disqus-identifier') || '',
+    };
+  });
+}
 """
 
 # Disqus 是否已把评论数注入所有文章（每篇的链接文本都非空）
@@ -89,6 +106,25 @@ def html_to_text(html: str) -> str:
     return "\n".join(ln.strip() for ln in text.split("\n") if ln.strip())
 
 
+def fetch_comment_counts(posts: list[dict]) -> None:
+    """批量查 Disqus 评论数；失败时保留列表页注入的文本值（空则 0）。"""
+    ids = [p["identifier"] for p in posts if p["identifier"]]
+    counts = {}
+    for i in range(0, len(ids), 20):  # 一批 20 篇，避免 URL 过长
+        query = urllib.parse.urlencode([("1", v) for v in ids[i:i + 20]])
+        try:
+            req = urllib.request.Request(f"{COUNT_API}?{query}", headers=HEADERS)
+            body = urllib.request.urlopen(req, timeout=20).read().decode("utf-8", "ignore")
+            data = json.loads(re.search(r"displayCount\((.*)\);", body, re.S).group(1))
+            counts.update({c["id"]: int(c["comments"]) for c in data["counts"]})
+        except Exception as exc:
+            log(f"  Disqus 计数接口不可用（{exc}），改用页面注入值")
+    for p in posts:
+        if p["identifier"] in counts:
+            p["comment_count"] = counts[p["identifier"]]
+    log(f"  评论数查询成功 {len(counts)}/{len(posts)} 篇")
+
+
 # --------------------------------------------------------------------------- #
 # 第一步：Playwright 扫描列表页（含分页）
 # --------------------------------------------------------------------------- #
@@ -128,11 +164,13 @@ def scan_list_pages(num_pages: int, start_page: int = 1) -> list[dict]:
                     "title": it["title"],
                     "author": re.sub(r"^by\s+", "", it["author"]).strip(),
                     "comment_count": int(m.group().replace(",", "")) if m else 0,
+                    "identifier": it["identifier"],
                 })
                 n_new += 1
             log(f"[Playwright]   新增 {n_new} 条（累计 {len(posts)} 条）")
             time.sleep(random.uniform(*PAGE_DELAY))
         browser.close()
+    fetch_comment_counts(posts)
     return posts
 
 
